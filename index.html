@@ -1,476 +1,126 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
-  <title>AR Image Scanner</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>WebAR Transparent</title>
 
-  <!-- MindAR + A-Frame -->
-  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
-  <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+<script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
 
-  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=JetBrains+Mono:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+html, body {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+}
 
-  <style>
-    :root {
-      --gold: #f5c842;
-      --gold-dim: rgba(245,200,66,0.15);
-      --red: #ff2d55;
-      --dark: #08080e;
-      --glass: rgba(8,8,14,0.88);
-    }
+a-scene {
+  position: fixed !important;
+  top: 0;
+  left: 0;
+  width: 100vw !important;
+  height: 100vh !important;
+  background: transparent !important;
+}
 
-    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+.instruction-container {
+  position: fixed;
+  bottom: 30px;
+  width: 100%;
+  text-align: center;
+  z-index: 999;
+  pointer-events: none;
+}
 
-    html, body {
-      width: 100%; height: 100%;
-      overflow: hidden;
-      background: var(--dark);
-      font-family: 'Bebas Neue', sans-serif;
-    }
-
-    /* ── AR Scene fills screen ─────────────────────────── */
-    #ar-scene {
-      position: fixed;
-      inset: 0;
-      width: 100% !important;
-      height: 100% !important;
-    }
-
-    /* ── HUD Shell ─────────────────────────────────────── */
-    #hud {
-      position: fixed;
-      inset: 0;
-      z-index: 100;
-      pointer-events: none;
-    }
-
-    /* Animated corner brackets */
-    .corner {
-      position: absolute;
-      width: 52px; height: 52px;
-    }
-    .corner::before, .corner::after {
-      content: '';
-      position: absolute;
-      background: var(--gold);
-    }
-    .corner::before { width: 100%; height: 2px; }
-    .corner::after  { width: 2px; height: 100%; }
-
-    .corner.tl { top: 18px; left: 18px; }
-    .corner.tr { top: 18px; right: 18px; transform: scaleX(-1); }
-    .corner.bl { bottom: 18px; left: 18px; transform: scaleY(-1); }
-    .corner.br { bottom: 18px; right: 18px; transform: scale(-1); }
-
-    /* ── Top bar ───────────────────────────────────────── */
-    #topbar {
-      position: fixed;
-      top: 0; left: 0; right: 0;
-      z-index: 101;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 16px 24px;
-      background: linear-gradient(to bottom, rgba(8,8,14,0.9) 0%, transparent 100%);
-    }
-
-    .brand {
-      display: flex;
-      align-items: baseline;
-      gap: 6px;
-    }
-    .brand-main {
-      font-size: 1.6rem;
-      letter-spacing: 0.2em;
-      color: var(--gold);
-      text-shadow: 0 0 30px rgba(245,200,66,0.5);
-      line-height: 1;
-    }
-    .brand-sub {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.55rem;
-      color: rgba(255,255,255,0.3);
-      letter-spacing: 0.15em;
-      text-transform: uppercase;
-    }
-
-    #status-badge {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 7px 14px;
-      border: 1px solid rgba(245,200,66,0.3);
-      border-radius: 100px;
-      background: rgba(245,200,66,0.06);
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.6rem;
-      letter-spacing: 0.12em;
-      color: var(--gold);
-      transition: all 0.4s ease;
-    }
-    #status-badge .dot {
-      width: 6px; height: 6px;
-      border-radius: 50%;
-      background: var(--gold);
-      animation: blink 1.2s ease-in-out infinite;
-    }
-    #status-badge.tracking {
-      border-color: rgba(255,45,85,0.5);
-      background: rgba(255,45,85,0.1);
-      color: var(--red);
-    }
-    #status-badge.tracking .dot {
-      background: var(--red);
-      animation: none;
-      box-shadow: 0 0 8px var(--red);
-    }
-    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
-
-    /* ── Scan reticle (centre of screen) ───────────────── */
-    #reticle {
-      position: fixed;
-      top: 50%; left: 50%;
-      transform: translate(-50%, -50%);
-      z-index: 100;
-      pointer-events: none;
-      transition: opacity 0.5s;
-    }
-
-    .reticle-ring {
-      width: 180px; height: 180px;
-      border-radius: 50%;
-      border: 1.5px solid rgba(245,200,66,0.2);
-      position: relative;
-      animation: spin 8s linear infinite;
-    }
-    .reticle-ring::before {
-      content: '';
-      position: absolute;
-      inset: 12px;
-      border-radius: 50%;
-      border: 1px dashed rgba(245,200,66,0.12);
-    }
-    .reticle-cross {
-      position: absolute;
-      top: 50%; left: 50%;
-      transform: translate(-50%,-50%);
-    }
-    .reticle-cross span {
-      display: block;
-      background: rgba(245,200,66,0.5);
-    }
-    .reticle-cross span:nth-child(1) { width: 20px; height: 1px; margin-bottom: 19px; }
-    .reticle-cross span:nth-child(2) {
-      width: 1px; height: 20px;
-      position: absolute;
-      top: -10px; left: 9.5px;
-    }
-
-    @keyframes spin { to { transform: rotate(360deg); } }
-    #reticle.hidden { opacity: 0; }
-
-    /* ── Instruction card ──────────────────────────────── */
-    #instruction {
-      position: fixed;
-      bottom: 100px; left: 50%;
-      transform: translateX(-50%);
-      z-index: 101;
-      background: var(--glass);
-      border: 1px solid rgba(245,200,66,0.2);
-      border-radius: 10px;
-      padding: 12px 22px;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.68rem;
-      color: rgba(255,255,255,0.55);
-      letter-spacing: 0.08em;
-      text-align: center;
-      white-space: nowrap;
-      transition: opacity 0.5s;
-      pointer-events: none;
-    }
-    #instruction strong { color: var(--gold); }
-    #instruction.hidden { opacity: 0; }
-
-    /* ── Bottom bar ────────────────────────────────────── */
-    #bottombar {
-      position: fixed;
-      bottom: 0; left: 0; right: 0;
-      z-index: 101;
-      padding: 18px 24px;
-      background: linear-gradient(to top, rgba(8,8,14,0.9) 0%, transparent 100%);
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-end;
-    }
-
-    .stat {
-      font-family: 'JetBrains Mono', monospace;
-    }
-    .stat-label {
-      font-size: 0.52rem;
-      color: rgba(255,255,255,0.25);
-      letter-spacing: 0.18em;
-      text-transform: uppercase;
-      margin-bottom: 2px;
-    }
-    .stat-value {
-      font-size: 0.75rem;
-      color: rgba(255,255,255,0.6);
-      transition: color 0.3s;
-    }
-    .stat-value.lit { color: var(--gold); }
-
-    /* ── Loading screen ────────────────────────────────── */
-    #loading-screen {
-      position: fixed;
-      inset: 0;
-      z-index: 200;
-      background: var(--dark);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 2rem;
-      transition: opacity 0.6s ease;
-    }
-    #loading-screen.fade-out {
-      opacity: 0;
-      pointer-events: none;
-    }
-
-    .loading-logo {
-      font-size: 3.5rem;
-      letter-spacing: 0.3em;
-      color: var(--gold);
-      text-shadow: 0 0 60px rgba(245,200,66,0.4);
-      animation: logoGlow 2s ease-in-out infinite alternate;
-    }
-    @keyframes logoGlow {
-      from { text-shadow: 0 0 20px rgba(245,200,66,0.3); }
-      to   { text-shadow: 0 0 60px rgba(245,200,66,0.7), 0 0 100px rgba(245,200,66,0.3); }
-    }
-
-    .loading-bar-wrap {
-      width: 200px;
-      height: 2px;
-      background: rgba(255,255,255,0.08);
-      border-radius: 2px;
-      overflow: hidden;
-    }
-    .loading-bar {
-      height: 100%;
-      background: var(--gold);
-      width: 0%;
-      transition: width 0.3s ease;
-      box-shadow: 0 0 10px var(--gold);
-    }
-    .loading-text {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.65rem;
-      color: rgba(255,255,255,0.3);
-      letter-spacing: 0.2em;
-    }
-
-    /* ── Video found pulse ─────────────────────────────── */
-    #found-flash {
-      position: fixed;
-      inset: 0;
-      z-index: 150;
-      background: rgba(245,200,66,0.12);
-      pointer-events: none;
-      opacity: 0;
-      transition: opacity 0.2s;
-    }
-    #found-flash.flash { opacity: 1; }
-  </style>
+.instruction-text {
+  font-size: 1rem;
+  color: #4facfe;
+  background: rgba(0, 0, 0, 0.7);
+  padding: 10px 20px;
+  border-radius: 10px;
+  border: 1px solid #4facfe;
+  display: inline-block;
+  text-transform: uppercase;
+}
+</style>
 </head>
+
 <body>
 
-  <!-- Loading screen -->
-  <div id="loading-screen">
-    <div class="loading-logo">ARCAM</div>
-    <div style="text-align:center;">
-      <div class="loading-bar-wrap"><div class="loading-bar" id="loadBar"></div></div>
-      <div class="loading-text" style="margin-top:12px;" id="loadText">INITIALIZING...</div>
-    </div>
+<div class="instruction-container" id="instruction-container">
+  <div class="instruction-text">
+    Point camera at image
   </div>
+</div>
 
-  <!-- Flash on target found -->
-  <div id="found-flash"></div>
+<a-scene
+  mindar-image="imageTargetSrc: ./targets.mind; uiScanning: no; uiLoading: no;"
+  vr-mode-ui="enabled: false"
+  device-orientation-permission-ui="enabled: false"
+  renderer="colorManagement: true; alpha: true;"
+  color-space="sRGB">
 
-  <!-- ══ MindAR + A-Frame Scene ══════════════════════════════════════════ -->
-  <a-scene
-    id="ar-scene"
-    mindar-image="imageTargetSrc: ./targets.mind; autoStart: true; uiLoading: no; uiError: no; uiScanning: no;"
-    color-space="sRGB"
-    renderer="colorManagement: true; physicallyCorrectLights: true"
-    vr-mode-ui="enabled: false"
-    device-orientation-permission-ui="enabled: false"
-  >
-    <a-assets>
-      <!-- Your video from GitHub repo -->
-      <video
-        id="ar-video"
-        src="./video.mp4"
-        preload="auto"
-        loop
-        muted
-        playsinline
-        webkit-playsinline
-        crossorigin="anonymous"
-      ></video>
-    </a-assets>
+  <a-assets>
+    <video id="ar-video"
+      src="./video.mp4"
+      preload="auto"
+      loop
+      playsinline
+      webkit-playsinline
+      crossorigin="anonymous">
+    </video>
+  </a-assets>
 
-    <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+  <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
 
-    <!-- Target 0 = your image.jpeg (index 0 = first image in targets.mind) -->
-    <a-entity mindar-image-target="targetIndex: 0">
+  <a-entity mindar-image-target="targetIndex: 0" id="target">
+    <a-video
+      src="#ar-video"
+      width="1"
+      height="0.5625"
+      position="0 0 0">
+    </a-video>
+  </a-entity>
 
-      <!-- Video plane rendered over the image -->
-      <a-video
-        src="#ar-video"
-        position="0 0 0.001"
-        width="1"
-        height="0.5625"
-        rotation="0 0 0"
-      ></a-video>
+</a-scene>
 
-      <!-- Subtle glowing frame around the video -->
-      <a-entity
-        geometry="primitive: plane; width: 1.04; height: 0.59"
-        material="color: #f5c842; opacity: 0.15; transparent: true; side: double"
-        position="0 0 0"
-      ></a-entity>
+<script>
+const video = document.getElementById('ar-video');
+const target = document.getElementById('target');
+const instruction = document.getElementById('instruction-container');
 
-    </a-entity>
+let visible = false;
 
-  </a-scene>
+// Mobile autoplay fix
+video.muted = true;
+video.setAttribute("playsinline", "");
+video.setAttribute("webkit-playsinline", "");
 
-  <!-- ══ HUD Overlay ════════════════════════════════════════════════════ -->
-  <div id="hud">
-    <div class="corner tl"></div>
-    <div class="corner tr"></div>
-    <div class="corner bl"></div>
-    <div class="corner br"></div>
-  </div>
+// When image detected
+target.addEventListener('targetFound', () => {
+  visible = true;
+  instruction.style.display = "none";
+  video.play().catch(() => {});
+});
 
-  <div id="topbar">
-    <div class="brand">
-      <div class="brand-main">ARCAM</div>
-      <div class="brand-sub">Image Tracker v1</div>
-    </div>
-    <div id="status-badge">
-      <div class="dot"></div>
-      <span id="status-text">SCANNING</span>
-    </div>
-  </div>
+// When image lost
+target.addEventListener('targetLost', () => {
+  visible = false;
+  instruction.style.display = "block";
+  video.pause();
+});
 
-  <div id="reticle">
-    <div class="reticle-ring">
-      <div class="reticle-cross">
-        <span></span>
-        <span></span>
-      </div>
-    </div>
-  </div>
+// Unlock audio after tap
+document.addEventListener("click", () => {
+  if (visible) {
+    video.muted = false;
+    video.play().catch(() => {});
+  }
+});
+</script>
 
-  <div id="instruction">
-    Point camera at your <strong>target image</strong> to play video
-  </div>
-
-  <div id="bottombar">
-    <div style="display:flex;gap:2rem;">
-      <div class="stat">
-        <div class="stat-label">Target</div>
-        <div class="stat-value" id="stat-target">—</div>
-      </div>
-      <div class="stat">
-        <div class="stat-label">Status</div>
-        <div class="stat-value" id="stat-status">Idle</div>
-      </div>
-    </div>
-    <div class="stat" style="text-align:right;">
-      <div class="stat-label">Video</div>
-      <div class="stat-value" id="stat-video">video.mp4</div>
-    </div>
-  </div>
-
-  <!-- ══ Logic ══════════════════════════════════════════════════════════ -->
-  <script>
-    // ── Loading bar animation ──────────────────────────────────────────
-    const loadBar  = document.getElementById('loadBar');
-    const loadText = document.getElementById('loadText');
-    const steps    = [
-      [20,  'LOADING AFRAME...'],
-      [45,  'LOADING MINDAR...'],
-      [70,  'PARSING TARGETS...'],
-      [90,  'STARTING CAMERA...'],
-      [100, 'READY'],
-    ];
-    let si = 0;
-    const loadInterval = setInterval(() => {
-      if (si >= steps.length) { clearInterval(loadInterval); return; }
-      loadBar.style.width  = steps[si][0] + '%';
-      loadText.textContent = steps[si][1];
-      si++;
-    }, 600);
-
-    // ── Hide loading screen once AR scene is ready ────────────────────
-    const scene = document.getElementById('ar-scene');
-    scene.addEventListener('arReady', () => {
-      clearInterval(loadInterval);
-      loadBar.style.width = '100%';
-      loadText.textContent = 'READY';
-      setTimeout(() => {
-        document.getElementById('loading-screen').classList.add('fade-out');
-        setTimeout(() => document.getElementById('loading-screen').remove(), 700);
-      }, 400);
-    });
-
-    // ── Target found / lost events ────────────────────────────────────
-    const videoEl    = document.getElementById('ar-video');
-    const badge      = document.getElementById('status-badge');
-    const statusText = document.getElementById('status-text');
-    const reticle    = document.getElementById('reticle');
-    const instruction= document.getElementById('instruction');
-    const flash      = document.getElementById('found-flash');
-    const statTarget = document.getElementById('stat-target');
-    const statStatus = document.getElementById('stat-status');
-
-    scene.addEventListener('targetFound', () => {
-      // Play video
-      videoEl.play().catch(() => {});
-
-      // HUD update
-      badge.classList.add('tracking');
-      statusText.textContent = 'TRACKING';
-      reticle.classList.add('hidden');
-      instruction.classList.add('hidden');
-      statTarget.textContent = 'image.jpeg';
-      statTarget.classList.add('lit');
-      statStatus.textContent = 'Playing';
-      statStatus.classList.add('lit');
-
-      // Flash effect
-      flash.classList.add('flash');
-      setTimeout(() => flash.classList.remove('flash'), 300);
-    });
-
-    scene.addEventListener('targetLost', () => {
-      // Pause video
-      videoEl.pause();
-
-      // HUD update
-      badge.classList.remove('tracking');
-      statusText.textContent = 'SCANNING';
-      reticle.classList.remove('hidden');
-      instruction.classList.remove('hidden');
-      statTarget.textContent = '—';
-      statTarget.classList.remove('lit');
-      statStatus.textContent = 'Idle';
-      statStatus.classList.remove('lit');
-    });
-  </script>
 </body>
 </html>
