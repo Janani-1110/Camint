@@ -3,527 +3,78 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
-  <title>WebAR — Marker Video Player</title>
+  <title>MindAR Video AR</title>
 
-  <!-- A-Frame + AR.js -->
+  <!-- A-Frame and MindAR -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/aframe/1.4.2/aframe.min.js"></script>
-  <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
-
-  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
 
   <style>
-    :root {
-      --neon: #39ff14;
-      --neon2: #ff6b35;
-      --dark: #050508;
-      --glass: rgba(5,5,8,0.85);
-    }
-
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-
     body {
-      font-family: 'Orbitron', monospace;
-      background: var(--dark);
-      color: #fff;
+      margin: 0;
       overflow: hidden;
+      font-family: Arial, sans-serif;
     }
-
-    /* ── HUD Overlay ─────────────────────────────────────────── */
-    #hud {
+    .loading {
       position: fixed;
-      inset: 0;
-      z-index: 9999;
-      pointer-events: none;
-    }
-
-    /* Corner brackets */
-    #hud::before, #hud::after {
-      content: '';
-      position: absolute;
-      width: 48px; height: 48px;
-      border-color: var(--neon);
-      border-style: solid;
-      opacity: 0.7;
-    }
-    #hud::before { top: 16px; left: 16px; border-width: 2px 0 0 2px; }
-    #hud::after  { top: 16px; right: 16px; border-width: 2px 2px 0 0; }
-
-    .hud-bottom::before, .hud-bottom::after {
-      content: '';
-      position: absolute;
-      width: 48px; height: 48px;
-      border-color: var(--neon);
-      border-style: solid;
-      opacity: 0.7;
-    }
-    .hud-bottom::before { bottom: 16px; left: 16px; border-width: 0 0 2px 2px; }
-    .hud-bottom::after  { bottom: 16px; right: 16px; border-width: 0 2px 2px 0; }
-
-    /* Top bar */
-    #topbar {
-      position: fixed;
-      top: 0; left: 0; right: 0;
-      z-index: 9999;
-      padding: 14px 24px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      background: linear-gradient(to bottom, rgba(5,5,8,0.9), transparent);
-    }
-
-    .logo-text {
-      font-size: 1.1rem;
-      font-weight: 900;
-      letter-spacing: 0.25em;
-      color: var(--neon);
-      text-shadow: 0 0 20px rgba(57,255,20,0.6);
-    }
-    .logo-text span { color: var(--neon2); }
-
-    #markerStatus {
-      font-family: 'DM Mono', monospace;
-      font-size: 0.65rem;
-      letter-spacing: 0.15em;
-      color: var(--neon);
-      padding: 6px 14px;
-      border: 1px solid rgba(57,255,20,0.4);
-      border-radius: 100px;
-      background: rgba(57,255,20,0.07);
-      transition: all 0.4s;
-    }
-    #markerStatus.found {
-      color: var(--neon2);
-      border-color: rgba(255,107,53,0.6);
-      background: rgba(255,107,53,0.1);
-      box-shadow: 0 0 16px rgba(255,107,53,0.3);
-    }
-
-    /* Bottom controls */
-    #bottombar {
-      position: fixed;
-      bottom: 0; left: 0; right: 0;
-      z-index: 9999;
-      padding: 18px 24px;
-      display: flex;
-      align-items: flex-end;
-      justify-content: space-between;
-      background: linear-gradient(to top, rgba(5,5,8,0.9), transparent);
-    }
-
-    .info-block {
-      font-family: 'DM Mono', monospace;
-    }
-    .info-block .label {
-      font-size: 0.55rem;
-      letter-spacing: 0.2em;
-      color: rgba(255,255,255,0.35);
-      text-transform: uppercase;
-      margin-bottom: 2px;
-    }
-    .info-block .value {
-      font-size: 0.75rem;
-      color: rgba(255,255,255,0.75);
-    }
-    .info-block .value.active { color: var(--neon); }
-
-    /* Config panel toggle */
-    #configToggle {
-      pointer-events: all;
-      background: rgba(57,255,20,0.1);
-      border: 1px solid rgba(57,255,20,0.3);
-      color: var(--neon);
-      font-family: 'Orbitron', monospace;
-      font-size: 0.6rem;
-      letter-spacing: 0.15em;
-      padding: 8px 16px;
-      border-radius: 6px;
-      cursor: pointer;
-      transition: all 0.2s;
-      text-transform: uppercase;
-    }
-    #configToggle:hover {
-      background: rgba(57,255,20,0.2);
-      box-shadow: 0 0 20px rgba(57,255,20,0.3);
-    }
-
-    /* Scanning pulse ring */
-    #scanRing {
-      position: fixed;
-      top: 50%; left: 50%;
+      top: 50%;
+      left: 50%;
       transform: translate(-50%, -50%);
-      z-index: 9998;
-      width: 200px; height: 200px;
-      border-radius: 50%;
-      border: 1.5px solid rgba(57,255,20,0.25);
-      animation: scanPulse 2s ease-out infinite;
-      pointer-events: none;
-    }
-    #scanRing::before {
-      content: '';
-      position: absolute;
-      inset: 18px;
-      border-radius: 50%;
-      border: 1px dashed rgba(57,255,20,0.15);
-      animation: scanPulse 2s ease-out infinite 0.5s;
-    }
-    @keyframes scanPulse {
-      0%   { transform: translate(-50%,-50%) scale(0.8); opacity: 0.8; }
-      100% { transform: translate(-50%,-50%) scale(1.6); opacity: 0; }
-    }
-    #scanRing.hidden { display: none; }
-
-    /* ── Config Modal ─────────────────────────────────────────── */
-    #configModal {
-      position: fixed;
-      inset: 0;
-      z-index: 10000;
-      background: rgba(5,5,8,0.92);
-      backdrop-filter: blur(8px);
-      display: none;
-      align-items: center;
-      justify-content: center;
-      padding: 20px;
-    }
-    #configModal.open { display: flex; }
-
-    .modal-box {
-      background: #0d0d15;
-      border: 1px solid rgba(57,255,20,0.25);
-      border-radius: 12px;
-      width: 100%;
-      max-width: 540px;
-      max-height: 90vh;
-      overflow-y: auto;
-      padding: 2rem;
-    }
-
-    .modal-box h2 {
-      font-size: 0.85rem;
-      letter-spacing: 0.25em;
-      color: var(--neon);
-      margin-bottom: 0.4rem;
-    }
-    .modal-box p {
-      font-family: 'DM Mono', monospace;
-      font-size: 0.72rem;
-      color: rgba(255,255,255,0.4);
-      margin-bottom: 1.5rem;
-      line-height: 1.6;
-    }
-
-    .section-title {
-      font-size: 0.6rem;
-      letter-spacing: 0.2em;
-      text-transform: uppercase;
-      color: rgba(255,255,255,0.3);
-      margin-bottom: 0.75rem;
-      padding-bottom: 0.4rem;
-      border-bottom: 1px solid rgba(255,255,255,0.08);
-    }
-
-    .marker-entry {
-      background: rgba(255,255,255,0.03);
-      border: 1px solid rgba(255,255,255,0.08);
-      border-radius: 8px;
-      padding: 1rem;
-      margin-bottom: 0.75rem;
-    }
-    .marker-entry label {
-      font-family: 'DM Mono', monospace;
-      font-size: 0.65rem;
-      color: rgba(255,255,255,0.4);
-      display: block;
-      margin-bottom: 0.3rem;
-      letter-spacing: 0.1em;
-    }
-    .marker-entry input, .marker-entry select {
-      width: 100%;
-      background: rgba(0,0,0,0.4);
-      border: 1px solid rgba(57,255,20,0.2);
-      color: #fff;
-      font-family: 'DM Mono', monospace;
-      font-size: 0.75rem;
-      padding: 8px 10px;
-      border-radius: 5px;
-      margin-bottom: 0.5rem;
-      outline: none;
-      transition: border-color 0.2s;
-    }
-    .marker-entry input:focus, .marker-entry select:focus {
-      border-color: var(--neon);
-    }
-    .marker-entry select option { background: #0d0d15; }
-
-    .btn-row { display: flex; gap: 0.75rem; margin-top: 1.5rem; }
-    .btn {
-      flex: 1;
-      padding: 10px;
-      border: none;
-      border-radius: 6px;
-      font-family: 'Orbitron', monospace;
-      font-size: 0.6rem;
-      letter-spacing: 0.15em;
-      text-transform: uppercase;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-    .btn-neon { background: var(--neon); color: #050508; font-weight: 700; }
-    .btn-neon:hover { box-shadow: 0 0 24px rgba(57,255,20,0.5); }
-    .btn-ghost { background: transparent; color: rgba(255,255,255,0.4); border: 1px solid rgba(255,255,255,0.15); }
-    .btn-ghost:hover { border-color: var(--neon); color: var(--neon); }
-
-    /* ── Instruction card ─────────────────────────────────────── */
-    #instructCard {
-      position: fixed;
-      bottom: 90px; left: 50%;
-      transform: translateX(-50%);
-      z-index: 9999;
-      background: rgba(5,5,8,0.85);
-      border: 1px solid rgba(57,255,20,0.25);
-      border-radius: 10px;
+      font-size: 1.2rem;
+      background: rgba(0,0,0,0.7);
+      color: white;
       padding: 12px 20px;
-      font-family: 'DM Mono', monospace;
-      font-size: 0.7rem;
-      color: rgba(255,255,255,0.6);
-      text-align: center;
-      letter-spacing: 0.05em;
-      white-space: nowrap;
-      pointer-events: none;
-      animation: fadeInUp 0.6s ease;
+      border-radius: 8px;
     }
-    #instructCard strong { color: var(--neon); }
-    @keyframes fadeInUp {
-      from { opacity: 0; transform: translateX(-50%) translateY(10px); }
-      to   { opacity: 1; transform: translateX(-50%) translateY(0); }
-    }
-
-    /* Scrollbar */
-    ::-webkit-scrollbar { width: 4px; }
-    ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: rgba(57,255,20,0.3); border-radius: 4px; }
-
-    /* A-Frame canvas */
-    .a-canvas { position: fixed !important; inset: 0 !important; }
   </style>
 </head>
 <body>
 
-  <!-- ── A-Frame WebAR Scene ───────────────────────────────────────────── -->
-  <a-scene
-    id="arScene"
-    embedded
-    arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3;"
-    vr-mode-ui="enabled: false"
-    renderer="logarithmicDepthBuffer: true; antialias: true;"
-    loading-screen="enabled: false"
-  >
+<div id="loading" class="loading">Initializing camera…</div>
 
-    <!-- Marker 1: Hiro — plays Video 1 -->
-    <a-marker id="marker-hiro" type="pattern" url="https://raw.githack.com/AR-js-org/AR.js/master/data/data/patt.hiro"
-      emitevents="true"
-      cursor="rayOrigin: local">
-      <a-video
-        id="vid-hiro"
-        src="#videoHiro"
-        width="2" height="1.125"
-        rotation="-90 0 0"
-        position="0 0.01 0">
-      </a-video>
-    </a-marker>
+<a-scene 
+  mindar-image="imageTargetSrc: targets.mind; autoStart: false;"
+  vr-mode-ui="enabled: false"
+  device-orientation-permission-ui="enabled: false"
+  embedded
+>
+  <a-assets>
+    <!-- Load your video -->
+    <video id="arVideo" src="video.mp4" preload="auto" loop crossorigin="anonymous" playsinline webkit-playsinline></video>
+  </a-assets>
 
-    <!-- Marker 2: Kanji — plays Video 2 -->
-    <a-marker id="marker-kanji" type="pattern" url="https://raw.githack.com/AR-js-org/AR.js/master/data/data/patt.kanji"
-      emitevents="true"
-      cursor="rayOrigin: local">
-      <a-video
-        id="vid-kanji"
-        src="#videoKanji"
-        width="2" height="1.125"
-        rotation="-90 0 0"
-        position="0 0.01 0">
-      </a-video>
-    </a-marker>
+  <!-- AR camera setup -->
+  <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
 
-    <!-- Camera -->
-    <a-entity camera></a-entity>
+  <!-- Your AR video appears when image target is found -->
+  <a-entity mindar-image-target="targetIndex: 0">
+    <a-video 
+      src="#arVideo" 
+      width="1.5" 
+      height="0.9" 
+      position="0 0 0"
+      rotation="0 0 0"
+    ></a-video>
+  </a-entity>
+</a-scene>
 
-    <!-- Asset videos -->
-    <a-assets>
-      <!-- Default sample videos (user can change these in config) -->
-      <video id="videoHiro"  src="https://www.w3schools.com/html/mov_bbb.mp4"
-             preload="auto" loop crossorigin="anonymous" playsinline webkit-playsinline></video>
-      <video id="videoKanji" src="https://www.w3schools.com/html/movie.mp4"
-             preload="auto" loop crossorigin="anonymous" playsinline webkit-playsinline></video>
-    </a-assets>
+<script>
+  // When MindAR is ready, start AR
+  const scene = document.querySelector('a-scene');
+  scene.addEventListener('renderstart', () => {
+    document.getElementById('loading').style.display = 'none';
+    scene.components['mindar-image'].start();
+  });
 
-  </a-scene>
+  // Video play on target found
+  const videoEl = document.getElementById('arVideo');
+  scene.addEventListener('targetFound', () => {
+    videoEl.play().catch(() => {});
+  });
+  scene.addEventListener('targetLost', () => {
+    videoEl.pause();
+  });
+</script>
 
-  <!-- ── HUD ─────────────────────────────────────────────────────────────── -->
-  <div id="hud">
-    <div class="hud-bottom"></div>
-  </div>
-
-  <div id="topbar">
-    <div class="logo-text">WEB<span>AR</span></div>
-    <div id="markerStatus">● SCANNING</div>
-  </div>
-
-  <div id="scanRing"></div>
-
-  <div id="instructCard">
-    Point camera at a <strong>HIRO</strong> or <strong>KANJI</strong> marker to play video
-  </div>
-
-  <div id="bottombar">
-    <div style="display:flex;gap:2rem;">
-      <div class="info-block">
-        <div class="label">Marker</div>
-        <div class="value" id="activeMarkerVal">—</div>
-      </div>
-      <div class="info-block">
-        <div class="label">Video</div>
-        <div class="value" id="activeVideoVal">—</div>
-      </div>
-    </div>
-    <button id="configToggle" onclick="openConfig()">⚙ Configure</button>
-  </div>
-
-  <!-- ── Config Modal ─────────────────────────────────────────────────────── -->
-  <div id="configModal">
-    <div class="modal-box">
-      <h2>MARKER → VIDEO CONFIG</h2>
-      <p>
-        Each AR marker triggers a different video. Point your camera at a printed or on-screen marker image.<br><br>
-        <strong style="color:rgba(255,255,255,0.6)">Built-in markers:</strong> Download and print<br>
-        • <a href="https://raw.githack.com/AR-js-org/AR.js/master/data/images/hiro.png" target="_blank" style="color:var(--neon)">HIRO marker ↗</a>&nbsp;&nbsp;
-        • <a href="https://raw.githack.com/AR-js-org/AR.js/master/data/images/kanji.png" target="_blank" style="color:var(--neon)">KANJI marker ↗</a>
-      </p>
-
-      <div class="section-title">Marker 1 — HIRO</div>
-      <div class="marker-entry">
-        <label>VIDEO URL (MP4 / WebM)</label>
-        <input id="hiroVideoUrl" type="text" value="https://www.w3schools.com/html/mov_bbb.mp4" placeholder="https://...video.mp4">
-        <label>VIDEO LABEL</label>
-        <input id="hiroLabel" type="text" value="Big Buck Bunny" placeholder="Label shown in HUD">
-      </div>
-
-      <div class="section-title" style="margin-top:1.2rem;">Marker 2 — KANJI</div>
-      <div class="marker-entry">
-        <label>VIDEO URL (MP4 / WebM)</label>
-        <input id="kanjiVideoUrl" type="text" value="https://www.w3schools.com/html/movie.mp4" placeholder="https://...video.mp4">
-        <label>VIDEO LABEL</label>
-        <input id="kanjiLabel" type="text" value="Sample Movie" placeholder="Label shown in HUD">
-      </div>
-
-      <div class="section-title" style="margin-top:1.2rem;">How It Works</div>
-      <div class="marker-entry" style="font-family:'DM Mono',monospace;font-size:0.68rem;color:rgba(255,255,255,0.45);line-height:1.7;">
-        1. Print or display a Hiro/Kanji marker image on screen.<br>
-        2. Open this page on a phone or laptop with a camera.<br>
-        3. Allow camera permission when prompted.<br>
-        4. Point camera at the marker — video plays floating over it in AR.<br>
-        5. Move the camera away to pause. Return to resume.
-      </div>
-
-      <div class="btn-row">
-        <button class="btn btn-neon" onclick="applyConfig()">Apply & Save</button>
-        <button class="btn btn-ghost" onclick="closeConfig()">Cancel</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ── Scripts ───────────────────────────────────────────────────────────── -->
-  <script>
-    // ── Config state ────────────────────────────────────────────────────────
-    const config = {
-      hiro:  { url: 'https://www.w3schools.com/html/mov_bbb.mp4',  label: 'Big Buck Bunny' },
-      kanji: { url: 'https://www.w3schools.com/html/movie.mp4',    label: 'Sample Movie'   }
-    };
-
-    // ── Marker event wiring (after AR.js scene loads) ────────────────────────
-    document.querySelector('a-scene').addEventListener('loaded', () => {
-      const markerHiro  = document.getElementById('marker-hiro');
-      const markerKanji = document.getElementById('marker-kanji');
-      const vidHiroEl   = document.getElementById('videoHiro');
-      const vidKanjiEl  = document.getElementById('videoKanji');
-
-      // HIRO marker found
-      markerHiro.addEventListener('markerFound', () => {
-        setMarkerActive('HIRO', config.hiro.label);
-        vidHiroEl.play().catch(() => {});
-      });
-      markerHiro.addEventListener('markerLost', () => {
-        vidHiroEl.pause();
-        clearMarkerActive('hiro');
-      });
-
-      // KANJI marker found
-      markerKanji.addEventListener('markerFound', () => {
-        setMarkerActive('KANJI', config.kanji.label);
-        vidKanjiEl.play().catch(() => {});
-      });
-      markerKanji.addEventListener('markerLost', () => {
-        vidKanjiEl.pause();
-        clearMarkerActive('kanji');
-      });
-    });
-
-    // ── HUD helpers ─────────────────────────────────────────────────────────
-    let activeCount = 0;
-
-    function setMarkerActive(markerName, videoLabel) {
-      activeCount++;
-      document.getElementById('markerStatus').textContent = '● MARKER FOUND';
-      document.getElementById('markerStatus').classList.add('found');
-      document.getElementById('scanRing').classList.add('hidden');
-      document.getElementById('activeMarkerVal').textContent = markerName;
-      document.getElementById('activeMarkerVal').classList.add('active');
-      document.getElementById('activeVideoVal').textContent = videoLabel;
-      document.getElementById('activeVideoVal').classList.add('active');
-      document.getElementById('instructCard').style.display = 'none';
-    }
-
-    function clearMarkerActive(which) {
-      activeCount = Math.max(0, activeCount - 1);
-      if (activeCount === 0) {
-        document.getElementById('markerStatus').textContent = '● SCANNING';
-        document.getElementById('markerStatus').classList.remove('found');
-        document.getElementById('scanRing').classList.remove('hidden');
-        document.getElementById('activeMarkerVal').textContent = '—';
-        document.getElementById('activeMarkerVal').classList.remove('active');
-        document.getElementById('activeVideoVal').textContent = '—';
-        document.getElementById('activeVideoVal').classList.remove('active');
-        document.getElementById('instructCard').style.display = 'block';
-      }
-    }
-
-    // ── Config modal ─────────────────────────────────────────────────────────
-    function openConfig() {
-      document.getElementById('hiroVideoUrl').value  = config.hiro.url;
-      document.getElementById('hiroLabel').value     = config.hiro.label;
-      document.getElementById('kanjiVideoUrl').value = config.kanji.url;
-      document.getElementById('kanjiLabel').value    = config.kanji.label;
-      document.getElementById('configModal').classList.add('open');
-    }
-
-    function closeConfig() {
-      document.getElementById('configModal').classList.remove('open');
-    }
-
-    function applyConfig() {
-      config.hiro.url    = document.getElementById('hiroVideoUrl').value.trim();
-      config.hiro.label  = document.getElementById('hiroLabel').value.trim() || 'Video 1';
-      config.kanji.url   = document.getElementById('kanjiVideoUrl').value.trim();
-      config.kanji.label = document.getElementById('kanjiLabel').value.trim() || 'Video 2';
-
-      // Hot-swap video sources
-      const vh = document.getElementById('videoHiro');
-      vh.pause(); vh.src = config.hiro.url; vh.load();
-
-      const vk = document.getElementById('videoKanji');
-      vk.pause(); vk.src = config.kanji.url; vk.load();
-
-      closeConfig();
-    }
-  </script>
 </body>
 </html>
